@@ -4,4 +4,15 @@ source "https://rubygems.org"
 
 gem "rails", "~> 7.2.0"
 
+group :development, :test do
+  gem "appraisal"
+  gem "rake"
+  gem "rspec-rails"
+  gem "rubocop"
+  gem "rubocop-rails"
+  gem "rubocop-rspec"
+  gem "simplecov", require: false
+  gem "webmock"
+end
+
 gemspec path: "../"
