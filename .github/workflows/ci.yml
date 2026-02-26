@@ -52,9 +52,6 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
 
-      - name: Generate Appraisal gemfiles
-        run: bundle exec appraisal install
-
       - name: Install Appraisal dependencies
         run: bundle exec appraisal ${{ matrix.rails }} bundle install
 
