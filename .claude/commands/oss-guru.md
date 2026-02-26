@@ -65,7 +65,7 @@ spec/
 - Test behavior, not implementation. If you refactor internals, zero test changes
 - Use shared examples for interface compliance (`it_behaves_like "a serializable object"`)
 - Integration tests with real HTTP (VCR/WebMock) for anything touching network
-- Matrix CI: test against Ruby 3.1, 3.2, 3.3, 3.4+ and relevant framework versions
+- Matrix CI: test against Ruby 3.2, 3.3, 3.4+ and relevant framework versions
 - Spec naming: `describe "#method_name"` for instance, `describe ".method_name"` for class
 
 ### Style & Conventions

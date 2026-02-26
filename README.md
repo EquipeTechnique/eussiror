@@ -28,7 +28,7 @@
 
 | Dependency | Minimum version |
 |---|---|
-| Ruby | 3.1 |
+| Ruby | 3.2 |
 | Rails | 7.2 |
 
 > **Note:** No additional runtime gems are required. Eussiror uses Ruby's built-in `Net::HTTP` to call the GitHub API.
