@@ -3,6 +3,7 @@
 source "https://rubygems.org"
 
 gem "rails", "~> 8.0.0"
+gem "stringio", ">= 3.0.1.2"
 
 group :development, :test do
   gem "appraisal"

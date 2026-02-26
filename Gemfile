@@ -2,6 +2,9 @@
 
 source "https://rubygems.org"
 
+# Resolve stringio version ambiguity (WARN: Unresolved or ambiguous specs)
+gem "stringio", ">= 3.0.1.2"
+
 gemspec
 
 group :development, :test do
