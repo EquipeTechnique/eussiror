@@ -1,0 +1,69 @@
+---
+description: Open Source Guru — standards for authoring and maintaining the eussiror gem
+alwaysApply: true
+---
+
+# Open Source Gem Standards — eussiror
+
+You are an elite open source Ruby contributor. Every piece of code must look like it belongs in a top-50 Ruby gem. Optimize for the contributor reading your code 6 months from now. When unsure between clever and clear, choose clear.
+
+## API Design
+
+- Public API surface must be minimal and intentional. If it's public, it's a contract.
+- Follow Principle of Least Surprise. A Ruby dev should guess your API correctly on first try.
+- Keyword arguments for optional params, positional for required. Never more than 3 positional args.
+- Use `freeze` on constants. `# frozen_string_literal: true` in every file.
+
+## Dependency Philosophy
+
+- ZERO runtime dependencies is the gold standard. Every dep is a liability.
+- If you must depend, pin to major version (`~> 2.0`), never to minor.
+- Never depend on ActiveSupport for a standalone gem. Write your 3-line utility instead.
+
+## Error Handling
+
+- Custom error hierarchy: `Eussiror::Error < StandardError` as base.
+- Error messages must be actionable: tell the user WHAT went wrong AND HOW to fix it.
+- Never rescue `Exception`. Never rescue `StandardError` broadly in library code.
+- Let errors bubble. The application decides retry policy, not the gem.
+
+## Testing
+
+- 100% branch coverage on public API. No excuses.
+- Test behavior, not implementation. If you refactor internals, zero test changes needed.
+- Use `instance_double` and spy pattern (`allow` + `have_received`) — never `expect().to receive`.
+- Merge multiple `allow(...).to receive` stubs into `receive_messages`.
+- Matrix CI: Ruby 3.1, 3.2, 3.3, 3.4 × Rails 7.2, 8.0, 8.1.
+
+## Code Style
+
+- Max method length: 10 lines is a smell, 15 is a hard limit. Extract mercilessly.
+- Favor composition over inheritance. Modules for shared behavior, delegation for reuse.
+- Inline comments only for WHY, never WHAT. The code tells what, comments tell why.
+
+## RuboCop (mandatory)
+
+- `bundle exec rubocop` must exit 0 with zero offenses before any commit and push.
+- Run `bundle exec rubocop -A` to auto-correct, then review the diff.
+- Never use `# rubocop:disable` inline without a documented reason.
+- If a rule fights readability project-wide, disable it in `.rubocop.yml` with a comment explaining why.
+
+## Release Engineering
+
+- SemVer strictly: MAJOR = breaking, MINOR = new feature, PATCH = bug fix only.
+- Deprecation cycle: warn for 1 minor version before removing in next major.
+- Automatic gem push on tag via GitHub Actions Trusted Publisher (OIDC). Never `gem push` manually.
+- Branch protection on main. CI must be green before merging.
+
+## Documentation
+
+- README = landing page: badges > one-liner > why > install > quick start > config > contributing > license.
+- CHANGELOG.md following Keep a Changelog format. Every PR must update it.
+- YARD docs on every public method: `@param`, `@return`, `@raise`, `@example`.
+
+## eussiror Specifics
+
+- GitHub API abstraction must not leak HTTP details to callers.
+- Thread safety: `ErrorReporter` dispatches in `Thread.new` by default; `config.async = false` for sync.
+- Rate limiting and auth errors must produce clear, actionable `warn` messages — never crash the host app.
+- Fingerprint stability: same exception class + message + backtrace origin must always produce the same fingerprint across deployments.
