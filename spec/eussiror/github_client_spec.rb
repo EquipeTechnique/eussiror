@@ -57,8 +57,8 @@ RSpec.describe Eussiror::GithubClient do
 
       it "embeds the fingerprint marker in the search query" do
         client.find_issue(fingerprint)
-        expect(WebMock).to have_requested(:get, search_url)
-          .with { |req| req.uri.query.include?(Eussiror::GithubClient::FINGERPRINT_MARKER) }
+        expect(WebMock).to(have_requested(:get, search_url)
+          .with { |req| req.uri.query.include?(Eussiror::GithubClient::FINGERPRINT_MARKER) })
       end
     end
 
@@ -151,15 +151,15 @@ RSpec.describe Eussiror::GithubClient do
     it "omits labels key when empty" do
       client.create_issue(title: "t", body: "b", labels: [])
 
-      expect(WebMock).to have_requested(:post, create_url)
-        .with { |req| !JSON.parse(req.body).key?("labels") }
+      expect(WebMock).to(have_requested(:post, create_url)
+        .with { |req| !JSON.parse(req.body).key?("labels") })
     end
 
     it "omits assignees key when empty" do
       client.create_issue(title: "t", body: "b", assignees: [])
 
-      expect(WebMock).to have_requested(:post, create_url)
-        .with { |req| !JSON.parse(req.body).key?("assignees") }
+      expect(WebMock).to(have_requested(:post, create_url)
+        .with { |req| !JSON.parse(req.body).key?("assignees") })
     end
 
     context "when the API returns an error" do

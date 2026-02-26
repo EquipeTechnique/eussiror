@@ -299,3 +299,4 @@ RSpec.describe Eussiror::ErrorReporter do
       expect(config1).to equal(config2)
     end
   end
+end

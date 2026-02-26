@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe Eussiror::Middleware do
-  let(:app)        { ->(env) { [status, {}, ["body"]] } }
+  let(:app)        { ->(_env) { [status, {}, ["body"]] } }
   let(:middleware) { described_class.new(app) }
   let(:env)        { { "REQUEST_METHOD" => "GET", "PATH_INFO" => "/" } }
   let(:status)     { 200 }
@@ -40,7 +40,7 @@ RSpec.describe Eussiror::Middleware do
       let(:status)    { 500 }
       let(:exception) { RuntimeError.new("server error") }
       let(:app) do
-        ->(rack_env) { [500, { "Content-Type" => "text/html" }, ["Internal Server Error"]] }
+        ->(_rack_env) { [500, { "Content-Type" => "text/html" }, ["Internal Server Error"]] }
       end
 
       before do
@@ -79,7 +79,7 @@ RSpec.describe Eussiror::Middleware do
 
     context "when the inner app raises an exception" do
       let(:app) do
-        ->(_env) { raise RuntimeError, "unexpected crash" }
+        ->(_env) { raise "unexpected crash" }
       end
 
       it "re-raises the exception" do

@@ -35,8 +35,8 @@ module Eussiror
 
       def process(exception, env, config)
         fingerprint = Fingerprint.compute(exception)
-        client      = GithubClient.new(
-          token:      config.github_token,
+        client = GithubClient.new(
+          token: config.github_token,
           repository: config.github_repository
         )
 
@@ -46,9 +46,9 @@ module Eussiror
           client.add_comment(existing_issue, body: occurrence_comment)
         else
           client.create_issue(
-            title:     issue_title(exception),
-            body:      issue_body(exception, env, fingerprint),
-            labels:    config.labels,
+            title: issue_title(exception),
+            body: issue_body(exception, env, fingerprint),
+            labels: config.labels,
             assignees: config.assignees
           )
         end
@@ -92,7 +92,7 @@ module Eussiror
       end
 
       def build_request_info(env)
-        return "" if env.nil? || env.empty?
+        return "" if env.blank?
 
         method      = env["REQUEST_METHOD"]
         path        = env["PATH_INFO"]

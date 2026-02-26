@@ -46,15 +46,13 @@ RSpec.describe Eussiror::Fingerprint do
     end
 
     it "skips gem lines and uses first app line" do
-      ex = build_exception(backtrace: [
-        "/home/user/.rvm/gems/ruby-3.2.0/gems/rack-3.0/lib/rack/base.rb:10",
-        "app/controllers/home_controller.rb:5:in 'index'"
-      ])
+      gem_line = "/home/user/.rvm/gems/ruby-3.2.0/gems/rack-3.0/lib/rack/base.rb:10"
+      app_line = "app/controllers/home_controller.rb:5:in 'index'"
+
+      ex = build_exception(backtrace: [gem_line, app_line])
       fp_app = described_class.compute(ex)
 
-      ex_gem_only = build_exception(backtrace: [
-        "/home/user/.rvm/gems/ruby-3.2.0/gems/rack-3.0/lib/rack/base.rb:10"
-      ])
+      ex_gem_only = build_exception(backtrace: [gem_line])
       fp_gem = described_class.compute(ex_gem_only)
 
       expect(fp_app).not_to eq(fp_gem)
@@ -76,16 +74,16 @@ RSpec.describe Eussiror::Fingerprint do
       expect { described_class.compute(exception) }.not_to raise_error
     end
 
-    context "gem path pattern filtering" do
+    context "when filtering gem path patterns" do
       %w[/ruby/ /rubygems vendor/bundle].each do |pattern|
         it "skips lines containing '#{pattern}'" do
-          ex = build_exception(backtrace: [
-            "/usr/local/lib#{pattern}foo.rb:1",
-            "app/controllers/clean.rb:5:in 'action'"
-          ])
+          gem_line = "/usr/local/lib#{pattern}foo.rb:1"
+          app_line = "app/controllers/clean.rb:5:in 'action'"
+
+          ex = build_exception(backtrace: [gem_line, app_line])
           fp_with_app = described_class.compute(ex)
 
-          ex_pattern_only = build_exception(backtrace: ["/usr/local/lib#{pattern}foo.rb:1"])
+          ex_pattern_only = build_exception(backtrace: [gem_line])
           fp_pattern_only = described_class.compute(ex_pattern_only)
 
           expect(fp_with_app).not_to eq(fp_pattern_only)

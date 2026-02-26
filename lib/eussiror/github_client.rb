@@ -26,7 +26,7 @@ module Eussiror
       data     = JSON.parse(response.body)
 
       return nil unless response.is_a?(Net::HTTPSuccess)
-      return nil if data["items"].nil? || data["items"].empty?
+      return nil if data["items"].blank?
 
       data["items"].first["number"]
     end
