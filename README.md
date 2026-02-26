@@ -142,20 +142,57 @@ app/controllers/dashboard_controller.rb:42:in 'index'
 
 ## GitHub token setup
 
-Eussiror needs a GitHub token with permission to read and create issues on your target repository.
+Eussiror needs a **GitHub token** to create issues on your behalf. Think of it like a password that lets the gem talk to GitHub for you — but you only use it in your app, never share it with anyone.
 
-**Option A — Classic personal access token:**
-Generate at `Settings → Developer settings → Personal access tokens → Tokens (classic)` and select the `repo` scope.
+### Step-by-step: how to create your token
 
-**Option B — Fine-grained personal access token:**
-Generate at `Settings → Developer settings → Personal access tokens → Fine-grained tokens`. Grant **Issues → Read and write** on the target repository only.
+1. **Log in to GitHub**
+   Go to [github.com](https://github.com) and sign in.
 
-Store the token in an environment variable (never hard-code it):
+2. **Open your profile menu**
+   Click your profile picture (top-right corner) → **Settings**.
 
-```bash
-# .env or your secrets manager
-GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-```
+3. **Go to Developer settings**
+   In the left sidebar, scroll down to the bottom → **Developer settings**.
+
+4. **Choose Personal access tokens**
+   Click **Personal access tokens** → choose either **Tokens (classic)** or **Fine-grained tokens** (see below).
+
+5. **Create a new token**
+   Click **Generate new token** (or **Generate new token (classic)**).
+
+6. **Configure the token**
+
+   **If you chose Classic:**
+   - Give it a name (e.g. `Eussiror for my-app`)
+   - Set an expiration (e.g. 90 days, or No expiration if you prefer)
+   - Check the **repo** scope (this allows reading and writing issues)
+
+   **If you chose Fine-grained:**
+   - Give it a name (e.g. `Eussiror for my-app`)
+   - Under **Repository access**, select **Only select repositories** and pick your repo
+   - Under **Permissions → Repository permissions**, set **Issues** to **Read and write**
+
+7. **Generate and copy**
+   Click **Generate token**.
+   **Important:** Copy the token immediately — GitHub will only show it once. It looks like `ghp_xxxxxxxxxxxxxxxxxxxx`.
+
+8. **Store it safely**
+   Never put the token in your code. Use an environment variable:
+
+   ```bash
+   # In .env (or your secrets manager)
+   GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+   ```
+
+   Then in your initializer: `config.github_token = ENV["GITHUB_TOKEN"]`.
+
+### Quick reference
+
+| Option | Where to find it | Permission needed |
+|--------|------------------|-------------------|
+| **Classic** | Settings → Developer settings → Personal access tokens → Tokens (classic) | `repo` scope |
+| **Fine-grained** | Settings → Developer settings → Personal access tokens → Fine-grained tokens | Issues: Read and write for your repo |
 
 ---
 
