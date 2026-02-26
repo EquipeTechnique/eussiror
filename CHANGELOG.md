@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-26
+
 ### Changed
 - Drop Ruby 3.1 support; minimum Ruby is now 3.2.0 (fixes Psych/strscan compatibility issues).
+- Disable Rails/NegateInclude RuboCop rule.
 
 ## [0.1.0] - 2026-02-26
 
