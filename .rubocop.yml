@@ -41,7 +41,27 @@ RSpec/MultipleExpectations:
 RSpec/NestedGroups:
   Max: 4
 
+# Enforce spy pattern: allow in setup, have_received in expectation
+RSpec/MessageSpies:
+  EnforcedStyle: have_received
+
+# Merge multiple allow(...).to receive into receive_messages
+RSpec/ReceiveMessages:
+  Enabled: true
+
 # Rails
 Rails/Output:
   Exclude:
     - "lib/eussiror/error_reporter.rb"
+
+# Prefer .exclude? over !.include?
+Rails/NegateInclude:
+  Enabled: true
+
+# Avoid regexp when a plain string argument is sufficient
+Style/RedundantRegexpArgument:
+  Enabled: true
+
+# Use %r{} for regexp literals containing forward slashes
+Style/RegexpLiteral:
+  EnforcedStyle: mixed
