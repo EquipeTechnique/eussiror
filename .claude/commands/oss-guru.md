@@ -97,6 +97,12 @@ spec/
 - Automatic gem push on tag. Never manual `gem push`
 - Branch protection on main. Require CI green + 1 review
 
+### Pre-commit Checklist (mandatory before any commit and push)
+- `bundle exec rubocop` must exit 0 with zero offenses — no exceptions
+- If RuboCop reports offenses, fix them before committing. Never use `# rubocop:disable` without a documented reason
+- Run `bundle exec rubocop -A` to auto-correct what can be auto-corrected, then review the diff
+- RuboCop config lives in `.rubocop.yml`. If a rule fights readability project-wide, disable it there with a comment explaining why — not inline in the code
+
 ### Gemspec Best Practices
 - `required_ruby_version` must be set and tested
 - `metadata` hash: `changelog_uri`, `source_code_uri`, `bug_tracker_uri`, `documentation_uri`
