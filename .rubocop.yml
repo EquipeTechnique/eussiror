@@ -1,0 +1,47 @@
+require:
+  - rubocop-rails
+  - rubocop-rspec
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.1
+  Exclude:
+    - "gemfiles/**/*"
+    - "tmp/**/*"
+    - "vendor/**/*"
+
+# Style
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+# Metrics
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "eussiror.gemspec"
+    - "Appraisals"
+
+Metrics/MethodLength:
+  Max: 20
+
+# RSpec
+RSpec/ExampleLength:
+  Max: 15
+
+RSpec/MultipleExpectations:
+  Max: 3
+
+RSpec/NestedGroups:
+  Max: 4
+
+# Rails
+Rails/Output:
+  Exclude:
+    - "lib/eussiror/error_reporter.rb"

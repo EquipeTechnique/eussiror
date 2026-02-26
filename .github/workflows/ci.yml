@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop --parallel
+
+  test:
+    name: "Tests — Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ruby: "3.1"
+            rails: "rails-7.2"
+          - ruby: "3.2"
+            rails: "rails-7.2"
+          - ruby: "3.2"
+            rails: "rails-8.0"
+          - ruby: "3.3"
+            rails: "rails-8.0"
+          - ruby: "3.3"
+            rails: "rails-8.1"
+          - ruby: "3.4"
+            rails: "rails-8.1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Install dependencies with Appraisal
+        run: bundle exec appraisal ${{ matrix.rails }} bundle install
+
+      - name: Run RSpec
+        run: bundle exec appraisal ${{ matrix.rails }} rspec --format progress
