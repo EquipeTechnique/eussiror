@@ -2,7 +2,7 @@
 
 **Maintainer:** [@tracyloisel](https://github.com/tracyloisel)
 
-[![Gem Version](https://badge.fury.io/rb/eussiror.svg)](https://badge.fury.io/rb/eussiror)
+[![Gem Version](https://img.shields.io/gem/v/eussiror.svg)](https://rubygems.org/gems/eussiror)
 [![CI](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml/badge.svg)](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
