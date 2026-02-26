@@ -52,7 +52,10 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
 
-      - name: Install dependencies with Appraisal
+      - name: Generate Appraisal gemfiles
+        run: bundle exec appraisal install
+
+      - name: Install Appraisal dependencies
         run: bundle exec appraisal ${{ matrix.rails }} bundle install
 
       - name: Run RSpec
