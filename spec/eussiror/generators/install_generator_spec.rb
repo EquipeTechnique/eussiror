@@ -2,10 +2,16 @@
 
 require "spec_helper"
 require "rails/generators"
+require "rails/generators/testing/behavior"
+require "fileutils"
 require "generators/eussiror/install/install_generator"
 
-RSpec.describe Eussiror::Generators::InstallGenerator, type: :generator do
-  destination File.expand_path("../../tmp/generator_test", __dir__)
+RSpec.describe Eussiror::Generators::InstallGenerator do
+  include Rails::Generators::Testing::Behavior
+  include FileUtils
+
+  tests Eussiror::Generators::InstallGenerator
+  destination File.expand_path("../../../tmp/generator_test", __dir__)
 
   before { prepare_destination }
 
