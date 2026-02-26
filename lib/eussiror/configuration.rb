@@ -37,7 +37,12 @@ module Eussiror
     private
 
     def current_environment
-      defined?(Rails) ? Rails.env.to_s : ENV.fetch("RAILS_ENV", "development")
+      return ENV.fetch("RAILS_ENV", "development") unless defined?(Rails)
+      return Rails.env.to_s if Rails.respond_to?(:env)
+
+      ENV.fetch("RAILS_ENV", "development")
+    rescue NoMethodError
+      ENV.fetch("RAILS_ENV", "development")
     end
   end
 end

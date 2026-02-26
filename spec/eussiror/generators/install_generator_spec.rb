@@ -10,13 +10,13 @@ RSpec.describe Eussiror::Generators::InstallGenerator do
   include Rails::Generators::Testing::Behavior
   include FileUtils
 
-  tests Eussiror::Generators::InstallGenerator
+  tests described_class
   destination File.expand_path("../../../tmp/generator_test", __dir__)
 
   before { prepare_destination }
 
   describe "create_initializer_file" do
-    before { run_generator }
+    before { generator([], {}).invoke_all }
 
     let(:initializer_path) { File.join(destination_root, "config/initializers/eussiror.rb") }
 
