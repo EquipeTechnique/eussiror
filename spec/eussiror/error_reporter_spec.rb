@@ -12,8 +12,8 @@ RSpec.describe Eussiror::ErrorReporter do
   let(:env) do
     {
       "REQUEST_METHOD" => "GET",
-      "PATH_INFO"      => "/dashboard",
-      "REMOTE_ADDR"    => "1.2.3.4"
+      "PATH_INFO" => "/dashboard",
+      "REMOTE_ADDR" => "1.2.3.4"
     }
   end
 
@@ -35,17 +35,21 @@ RSpec.describe Eussiror::ErrorReporter do
           c.environments      = %w[production]
         end
         allow(ENV).to receive(:fetch).with("RAILS_ENV", "development").and_return("production")
+        allow(Eussiror::GithubClient).to receive(:new)
 
-        expect(Eussiror::GithubClient).not_to receive(:new)
         described_class.report(exception, env)
+
+        expect(Eussiror::GithubClient).not_to have_received(:new)
       end
 
       it "does nothing when current env is not in configured environments" do
         configure_eussiror(env_name: "production")
         allow(ENV).to receive(:fetch).with("RAILS_ENV", "development").and_return("development")
+        allow(Eussiror::GithubClient).to receive(:new)
 
-        expect(Eussiror::GithubClient).not_to receive(:new)
         described_class.report(exception, env)
+
+        expect(Eussiror::GithubClient).not_to have_received(:new)
       end
     end
 
@@ -53,17 +57,21 @@ RSpec.describe Eussiror::ErrorReporter do
       it "skips reporting" do
         configure_eussiror
         Eussiror.configuration.ignored_exceptions = %w[RuntimeError]
+        allow(Eussiror::GithubClient).to receive(:new)
 
-        expect(Eussiror::GithubClient).not_to receive(:new)
         described_class.report(exception, env)
+
+        expect(Eussiror::GithubClient).not_to have_received(:new)
       end
 
       it "skips reporting for subclass of ignored exception" do
         configure_eussiror
         Eussiror.configuration.ignored_exceptions = %w[StandardError]
+        allow(Eussiror::GithubClient).to receive(:new)
 
-        expect(Eussiror::GithubClient).not_to receive(:new)
         described_class.report(exception, env)
+
+        expect(Eussiror::GithubClient).not_to have_received(:new)
       end
 
       it "does not skip reporting when the class name does not exist (NameError rescued)" do
@@ -72,8 +80,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
         mock_client = instance_double(Eussiror::GithubClient)
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:find_issue).and_return(nil)
-        allow(mock_client).to receive(:create_issue).and_return(1)
+        allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
 
         expect { described_class.report(exception, env) }.not_to raise_error
         expect(mock_client).to have_received(:create_issue)
@@ -86,8 +93,7 @@ RSpec.describe Eussiror::ErrorReporter do
       before do
         configure_eussiror
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:find_issue).and_return(nil)
-        allow(mock_client).to receive(:create_issue).and_return(1)
+        allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
       end
 
       it "creates a new issue" do
@@ -138,8 +144,7 @@ RSpec.describe Eussiror::ErrorReporter do
       before do
         configure_eussiror
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:find_issue).and_return(42)
-        allow(mock_client).to receive(:add_comment).and_return(999)
+        allow(mock_client).to receive_messages(find_issue: 42, add_comment: 999)
       end
 
       it "adds a comment to the existing issue" do
@@ -191,8 +196,7 @@ RSpec.describe Eussiror::ErrorReporter do
       before do
         configure_eussiror(async: true)
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:find_issue).and_return(nil)
-        allow(mock_client).to receive(:create_issue).and_return(1)
+        allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
       end
 
       it "spawns a thread and still calls create_issue" do
@@ -210,15 +214,14 @@ RSpec.describe Eussiror::ErrorReporter do
     before do
       configure_eussiror
       allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-      allow(mock_client).to receive(:find_issue).and_return(nil)
-      allow(mock_client).to receive(:create_issue).and_return(1)
+      allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
     end
 
     it "omits request info when env is empty" do
       described_class.report(exception, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(body: satisfy { |b| !b.include?("**Request:**") })
+        hash_including(body: satisfy { |b| b.exclude?("**Request:**") })
       )
     end
 
@@ -226,7 +229,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, { "PATH_INFO" => "/foo" })
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(body: satisfy { |b| !b.include?("**Request:**") })
+        hash_including(body: satisfy { |b| b.exclude?("**Request:**") })
       )
     end
 
@@ -236,7 +239,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
       expect(mock_client).to have_received(:create_issue).with(
         hash_including(body: satisfy { |b|
-          b.include?("POST /api/action") && !b.include?("**Remote IP:**")
+          b.include?("POST /api/action") && b.exclude?("**Remote IP:**")
         })
       )
     end
@@ -250,7 +253,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
       expect(mock_client).to have_received(:create_issue).with(
         hash_including(body: satisfy { |b|
-          b.scan(/app\/models\/foo\.rb/).length == Eussiror::ErrorReporter::MAX_BACKTRACE_LINES
+          b.scan("app/models/foo.rb").length == Eussiror::ErrorReporter::MAX_BACKTRACE_LINES
         })
       )
     end
@@ -265,7 +268,7 @@ RSpec.describe Eussiror::ErrorReporter do
         hash_including(title: include("first line"))
       )
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(title: satisfy { |t| !t.include?("second line") })
+        hash_including(title: satisfy { |t| t.exclude?("second line") })
       )
     end
 
