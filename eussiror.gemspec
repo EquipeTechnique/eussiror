@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
     If an issue already exists for the same error (identified by fingerprint),
     it adds a comment with the new occurrence timestamp instead.
   DESC
-  spec.homepage = "https://github.com/tracyloisel/eussiror"
+  spec.homepage = "https://github.com/EquipeTechnique/eussiror"
   spec.license  = "MIT"
 
   spec.required_ruby_version = ">= 3.1.0"

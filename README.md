@@ -3,7 +3,7 @@
 **Maintainer:** [@tracyloisel](https://github.com/tracyloisel)
 
 [![Gem Version](https://badge.fury.io/rb/eussiror.svg)](https://badge.fury.io/rb/eussiror)
-[![CI](https://github.com/tracyloisel/eussiror/actions/workflows/ci.yml/badge.svg)](https://github.com/tracyloisel/eussiror/actions/workflows/ci.yml)
+[![CI](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml/badge.svg)](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Eussiror** automatically creates GitHub issues when your Rails application returns a 500 error in production. If the same error already has an open issue, it adds a comment with the new occurrence timestamp instead — keeping your issue tracker clean and deduplicated.
