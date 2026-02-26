@@ -144,7 +144,7 @@ RSpec.describe Eussiror::ErrorReporter do
       before do
         configure_eussiror
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive_messages(find_issue: 42, add_comment: 999)
+        allow(mock_client).to receive_messages(find_issue: 42, add_comment: 999, create_issue: 1)
       end
 
       it "adds a comment to the existing issue" do
@@ -221,7 +221,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(body: satisfy { |b| b.exclude?("**Request:**") })
+        satisfy { |h| h[:body].exclude?("**Request:**") }
       )
     end
 
@@ -229,7 +229,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, { "PATH_INFO" => "/foo" })
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(body: satisfy { |b| b.exclude?("**Request:**") })
+        satisfy { |h| h[:body].exclude?("**Request:**") }
       )
     end
 
@@ -238,9 +238,9 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, env_without_ip)
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(body: satisfy { |b|
-          b.include?("POST /api/action") && b.exclude?("**Remote IP:**")
-        })
+        satisfy { |h|
+          h[:body].include?("POST /api/action") && h[:body].exclude?("**Remote IP:**")
+        }
       )
     end
 
@@ -265,10 +265,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(multiline_ex, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(title: include("first line"))
-      )
-      expect(mock_client).to have_received(:create_issue).with(
-        hash_including(title: satisfy { |t| t.exclude?("second line") })
+        hash_including(title: satisfy { |t| t.include?("first line") && t.exclude?("second line") })
       )
     end
 
