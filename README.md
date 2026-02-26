@@ -276,7 +276,7 @@ Standard `Rails::Generators::Base` subclass. Copies `templates/initializer.rb.tt
 
 ```bash
 # Clone and install
-git clone https://github.com/tracyloisel/eussiror.git
+git clone https://github.com/EquipeTechnique/eussiror.git
 cd eussiror
 bundle install
 
