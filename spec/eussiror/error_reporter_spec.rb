@@ -221,7 +221,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        satisfy { |h| h[:body].exclude?("**Request:**") }
+        satisfy { |h| !h[:body].include?("**Request:**") }
       )
     end
 
@@ -229,7 +229,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(exception, { "PATH_INFO" => "/foo" })
 
       expect(mock_client).to have_received(:create_issue).with(
-        satisfy { |h| h[:body].exclude?("**Request:**") }
+        satisfy { |h| !h[:body].include?("**Request:**") }
       )
     end
 
@@ -239,7 +239,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
       expect(mock_client).to have_received(:create_issue).with(
         satisfy { |h|
-          h[:body].include?("POST /api/action") && h[:body].exclude?("**Remote IP:**")
+          h[:body].include?("POST /api/action") && !h[:body].include?("**Remote IP:**")
         }
       )
     end
@@ -265,7 +265,7 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(multiline_ex, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(title: satisfy { |t| t.include?("first line") && t.exclude?("second line") })
+        hash_including(title: satisfy { |t| t.include?("first line") && !t.include?("second line") })
       )
     end
 
