@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** Replace Rack middleware with `Rails.error.subscribe` (`ActiveSupport::ErrorReporter`). Eussiror now catches **all** unhandled exceptions (HTTP requests, ActiveJob, Action Cable, Rake, etc.), not just HTTP 500s.
+- Issue titles use source-aware tags (`[request]`, `[job]`, `[cable]`, `[error]`) instead of `[500]`.
+- `Eussiror::Middleware` has been removed; `Eussiror::ErrorSubscriber` replaces it.
+- Source classification is now hybrid (strict mapping + heuristics on source strings) to reduce false `[error]` tags across Rails/runtime variants.
+
 ### Added
+- `Eussiror::ErrorSubscriber` — `Rails.error` subscriber registered via the Railtie.
+- `Configuration#report_handled_errors` (default `false`) to optionally report errors caught by `Rails.error.handle`.
+- **Source** line in issue Context section for non-default sources (e.g. `job`, `request`).
 - Additional release environment variables (`SOURCE_VERSION`, `RAILWAY_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `CI_COMMIT_SHA`, `GITHUB_SHA`) alongside existing keys.
+- `Eussiror::ContextExtractor` to normalize heterogeneous Rails.error context payloads (string/symbol keys, nested env/request/headers, request objects).
 
 ## [0.3.0] - 2026-04-02
 

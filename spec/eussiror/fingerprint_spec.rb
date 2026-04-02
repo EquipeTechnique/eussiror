@@ -3,9 +3,9 @@
 require "spec_helper"
 
 RSpec.describe Eussiror::Fingerprint do
-  def build_exception(klass: RuntimeError, message: "something went wrong", backtrace: nil)
+  def build_exception(klass: RuntimeError, message: "the signal is weak", backtrace: nil)
     exception = klass.new(message)
-    exception.set_backtrace(backtrace || ["app/controllers/foo_controller.rb:42:in 'bar'"])
+    exception.set_backtrace(backtrace || ["app/controllers/xfiles_controller.rb:42:in 'investigate'"])
     exception
   end
 
@@ -28,8 +28,8 @@ RSpec.describe Eussiror::Fingerprint do
     end
 
     it "returns different fingerprints for different messages" do
-      ex1 = build_exception(message: "error A")
-      ex2 = build_exception(message: "error B")
+      ex1 = build_exception(message: "signal alpha")
+      ex2 = build_exception(message: "signal beta")
       expect(described_class.compute(ex1)).not_to eq(described_class.compute(ex2))
     end
 
@@ -40,14 +40,14 @@ RSpec.describe Eussiror::Fingerprint do
     end
 
     it "handles exceptions with no backtrace" do
-      exception = RuntimeError.new("no trace")
+      exception = RuntimeError.new("no trail in the dark")
       exception.set_backtrace(nil)
       expect { described_class.compute(exception) }.not_to raise_error
     end
 
     it "skips gem lines and uses first app line" do
       gem_line = "/home/user/.rvm/gems/ruby-3.2.0/gems/rack-3.0/lib/rack/base.rb:10"
-      app_line = "app/controllers/home_controller.rb:5:in 'index'"
+      app_line = "app/controllers/xfiles_controller.rb:5:in 'index'"
 
       ex = build_exception(backtrace: [gem_line, app_line])
       fp_app = described_class.compute(ex)
@@ -69,7 +69,7 @@ RSpec.describe Eussiror::Fingerprint do
     end
 
     it "handles an empty backtrace array without raising" do
-      exception = RuntimeError.new("empty trace")
+      exception = RuntimeError.new("empty paranormal trace")
       exception.set_backtrace([])
       expect { described_class.compute(exception) }.not_to raise_error
     end
@@ -77,8 +77,8 @@ RSpec.describe Eussiror::Fingerprint do
     context "when filtering gem path patterns" do
       %w[/ruby/ /rubygems vendor/bundle].each do |pattern|
         it "skips lines containing '#{pattern}'" do
-          gem_line = "/usr/local/lib#{pattern}foo.rb:1"
-          app_line = "app/controllers/clean.rb:5:in 'action'"
+          gem_line = "/usr/local/lib#{pattern}xfiles.rb:1"
+          app_line = "app/controllers/investigation.rb:5:in 'action'"
 
           ex = build_exception(backtrace: [gem_line, app_line])
           fp_with_app = described_class.compute(ex)

@@ -31,6 +31,13 @@ Metrics/BlockLength:
 Metrics/MethodLength:
   Max: 20
 
+Metrics/ModuleLength:
+  Max: 110
+
+# issue_body uses a keyword arg (source_tag:) on top of 5 positional — readable enough
+Metrics/ParameterLists:
+  Max: 6
+
 # RSpec
 RSpec/ExampleLength:
   Max: 15

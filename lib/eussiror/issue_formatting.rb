@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
 module Eussiror
-  # Builds GitHub issue bodies and occurrence comments from exceptions and Rack env.
-  # Respects Configuration#issue_privacy.
+  # Builds GitHub issue bodies and occurrence comments.
+  # Accepts either a Rack env hash or a plain Rails.error context hash.
   module IssueFormatting
     USER_ID_KEY    = "eussiror.user_id"
     USER_LABEL_KEY = "eussiror.user_label"
 
     class << self
-      def issue_body(exception, env, fingerprint, config, max_backtrace_lines)
+      def issue_body(exception, context, fingerprint, config, max_backtrace_lines, source_tag: "error")
+        normalized = ContextExtractor.normalize(context)
         <<~BODY
           #{error_details_section(exception)}
-          #{context_section(config)}
-          #{user_section(env, config)}
-          #{request_section(env, config)}
+          #{context_section(config, source_tag)}
+          #{user_section(normalized, config)}
+          #{request_section(normalized, config)}
           ## Backtrace
 
           ```
@@ -24,8 +25,9 @@ module Eussiror
         BODY
       end
 
-      def occurrence_comment(env, config)
-        occurrence_lines(env, config).join("\n\n")
+      def occurrence_comment(context, config)
+        normalized = ContextExtractor.normalize(context)
+        occurrence_lines(normalized, config).join("\n\n")
       end
 
       private
@@ -45,8 +47,9 @@ module Eussiror
         SECTION
       end
 
-      def context_section(config)
+      def context_section(config, source_tag)
         lines = ["**Environment:** `#{config.environment_name}`"]
+        lines << "**Source:** `#{source_tag}`" unless source_tag == "error"
         rel = ReleaseEnv.label
         lines << "**Release:** `#{rel}`" if rel
 
@@ -58,11 +61,11 @@ module Eussiror
         SECTION
       end
 
-      def user_section(env, config)
+      def user_section(normalized, config)
         return "" unless config.issue_privacy == :full
 
-        uid   = env[USER_ID_KEY]
-        label = env[USER_LABEL_KEY]
+        uid   = normalized[:user_id]
+        label = normalized[:user_label]
         return "" if string_blank?(uid) && string_blank?(label)
 
         parts = []
@@ -77,8 +80,8 @@ module Eussiror
         SECTION
       end
 
-      def request_section(env, config)
-        fragment = build_request_fragment(env, config)
+      def request_section(normalized, config)
+        fragment = build_request_fragment(normalized, config)
         return "" if string_blank?(fragment)
 
         <<~SECTION
@@ -89,55 +92,51 @@ module Eussiror
         SECTION
       end
 
-      def build_request_fragment(env, config)
-        return "" if env.blank?
-
-        method = env["REQUEST_METHOD"]
-        path   = env["PATH_INFO"]
+      def build_request_fragment(normalized, config)
+        method = normalized[:request_method]
+        path   = normalized[:path]
         return "" unless method && path
 
         lines = ["**Request:** `#{method} #{path}`"]
         return lines.join("\n") if config.issue_privacy == :minimal
 
-        append_ip_and_agent(lines, env)
+        append_ip_and_agent(lines, normalized)
         lines.join("\n")
       end
 
-      def append_ip_and_agent(lines, env)
-        ra = env["REMOTE_ADDR"]
+      def append_ip_and_agent(lines, normalized)
+        ra = normalized[:remote_ip]
         lines << "**Remote IP:** #{ra}" unless string_blank?(ra)
-        ua = env["HTTP_USER_AGENT"]
+        ua = normalized[:user_agent]
         lines << "**User-Agent:** #{ua}" unless string_blank?(ua)
       end
 
-      def occurrence_lines(env, config)
+      def occurrence_lines(normalized, config)
         ts = Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")
         lines = ["**New occurrence:** #{ts}"]
-        req = request_summary_line(env)
+        req = request_summary_line(normalized)
         lines << "**Request:** `#{req}`" if req
-        append_occurrence_privacy(lines, env, config)
+        append_occurrence_privacy(lines, normalized, config)
         lines
       end
 
-      def append_occurrence_privacy(lines, env, config)
+      def append_occurrence_privacy(lines, normalized, config)
         case config.issue_privacy
         when :standard, :full
-          ra = env["REMOTE_ADDR"]
+          ra = normalized[:remote_ip]
           lines << "**Remote IP:** #{ra}" unless string_blank?(ra)
-          ua = env["HTTP_USER_AGENT"]
+          ua = normalized[:user_agent]
           lines << "**User-Agent:** #{ua}" unless string_blank?(ua)
         end
         return unless config.issue_privacy == :full
 
-        uid = env[USER_ID_KEY]
+        uid = normalized[:user_id]
         lines << "**User id:** `#{uid}`" unless string_blank?(uid)
       end
 
-      def request_summary_line(env)
-        return nil if env.blank?
-
-        method = env["REQUEST_METHOD"]
-        path   = env["PATH_INFO"]
+      def request_summary_line(normalized)
+        method = normalized[:request_method]
+        path   = normalized[:path]
         return nil unless method && path
 
         "#{method} #{path}"

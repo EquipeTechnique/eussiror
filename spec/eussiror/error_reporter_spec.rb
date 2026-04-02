@@ -87,11 +87,11 @@ RSpec.describe Eussiror::ErrorReporter do
 
       it "does not skip reporting when the class name does not exist (NameError rescued)" do
         configure_eussiror
-        Eussiror.configuration.ignored_exceptions = %w[NonExistent::ClassName]
 
         mock_client = instance_double(Eussiror::GithubClient)
         allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
         allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
+        Eussiror.configuration.ignored_exceptions = %w[NonExistent::ClassName]
 
         expect { described_class.report(exception, env) }.not_to raise_error
         expect(mock_client).to have_received(:create_issue)
@@ -107,11 +107,67 @@ RSpec.describe Eussiror::ErrorReporter do
         allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
       end
 
-      it "creates a new issue" do
+      it "creates a new issue with [error] tag by default" do
         described_class.report(exception, env)
 
         expect(mock_client).to have_received(:create_issue).with(
-          hash_including(title: start_with("[500] RuntimeError"))
+          hash_including(title: start_with("[error] RuntimeError"))
+        )
+      end
+
+      it "uses [request] tag for ActionDispatch::Executor source" do
+        described_class.report(exception, env, source: "ActionDispatch::Executor")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[request] RuntimeError"))
+        )
+      end
+
+      it "uses [job] tag for ActiveJob source" do
+        described_class.report(exception, {}, source: "ActiveJob")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[job] RuntimeError"))
+        )
+      end
+
+      it "uses [cable] tag for ActionCable::Connection source" do
+        described_class.report(exception, {}, source: "ActionCable::Connection")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[cable] RuntimeError"))
+        )
+      end
+
+      it "falls back to [error] for unknown source" do
+        described_class.report(exception, {}, source: "SomethingElse")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[error] RuntimeError"))
+        )
+      end
+
+      it "maps heuristic ActiveJob source variants to [job]" do
+        described_class.report(exception, {}, source: "ActiveJob::QueueAdapters::SidekiqAdapter")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[job] RuntimeError"))
+        )
+      end
+
+      it "maps heuristic ActionDispatch source variants to [request]" do
+        described_class.report(exception, {}, source: "ActionDispatch::ShowExceptions")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[request] RuntimeError"))
+        )
+      end
+
+      it "maps heuristic ActionCable source variants to [cable]" do
+        described_class.report(exception, {}, source: "ActionCable::Channel::Base")
+
+        expect(mock_client).to have_received(:create_issue).with(
+          hash_including(title: start_with("[cable] RuntimeError"))
         )
       end
 
@@ -242,7 +298,7 @@ RSpec.describe Eussiror::ErrorReporter do
       allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
     end
 
-    it "omits request info when env is empty" do
+    it "omits request info when context is empty" do
       described_class.report(exception, {})
 
       expect(mock_client).to have_received(:create_issue).with(
@@ -258,14 +314,32 @@ RSpec.describe Eussiror::ErrorReporter do
       )
     end
 
-    it "omits REMOTE_ADDR when not present in env" do
-      env_without_ip = { "REQUEST_METHOD" => "POST", "PATH_INFO" => "/api/action" }
-      described_class.report(exception, env_without_ip)
+    it "omits REMOTE_ADDR when not present" do
+      ctx = { "REQUEST_METHOD" => "POST", "PATH_INFO" => "/api/action" }
+      described_class.report(exception, ctx)
 
       expect(mock_client).to have_received(:create_issue).with(
         satisfy { |h|
           h[:body].include?("POST /api/action") && !h[:body].include?("**Remote IP:**")
         }
+      )
+    end
+
+    it "extracts request context from symbol keys" do
+      ctx = { REQUEST_METHOD: "DELETE", PATH_INFO: "/symbol/path", REMOTE_ADDR: "8.8.8.8" }
+      described_class.report(exception, ctx)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("DELETE /symbol/path"))
+      )
+    end
+
+    it "extracts request context from nested env hash" do
+      ctx = { env: { "REQUEST_METHOD" => "PUT", "PATH_INFO" => "/nested/path" } }
+      described_class.report(exception, ctx)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("PUT /nested/path"))
       )
     end
 
@@ -302,7 +376,23 @@ RSpec.describe Eussiror::ErrorReporter do
       described_class.report(ex, {})
 
       expect(mock_client).to have_received(:create_issue).with(
-        hash_including(title: satisfy { |t| t.length <= "[500] RuntimeError: ".length + 120 })
+        hash_including(title: satisfy { |t| t.length <= "[error] RuntimeError: ".length + 120 })
+      )
+    end
+
+    it "includes Source in Context for non-default source" do
+      described_class.report(exception, env, source: "ActiveJob")
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("**Source:** `job`"))
+      )
+    end
+
+    it "omits Source line for default application source" do
+      described_class.report(exception, env)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        satisfy { |h| !h[:body].include?("**Source:**") }
       )
     end
   end
@@ -314,8 +404,18 @@ RSpec.describe Eussiror::ErrorReporter do
         "REQUEST_METHOD" => "GET",
         "PATH_INFO" => "/x",
         "REMOTE_ADDR" => "10.0.0.1",
-        "HTTP_USER_AGENT" => "TestAgent/1.0",
+        "HTTP_USER_AGENT" => "MulderWebAgent/1.0",
         Eussiror::ErrorReporter::USER_ID_KEY => "42"
+      }
+    end
+    let(:nested_context) do
+      {
+        env: {
+          REQUEST_METHOD: "GET",
+          PATH_INFO: "/nested",
+          REMOTE_ADDR: "10.10.10.10",
+          HTTP_USER_AGENT: "ScullyEdgeAgent/1.0"
+        }
       }
     end
 
@@ -347,7 +447,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
       expect(mock_client).to have_received(:create_issue).with(
         satisfy { |h|
-          h[:body].include?("**Remote IP:** 10.0.0.1") && h[:body].include?("TestAgent/1.0")
+          h[:body].include?("**Remote IP:** 10.0.0.1") && h[:body].include?("MulderWebAgent/1.0")
         }
       )
     end
@@ -396,6 +496,18 @@ RSpec.describe Eussiror::ErrorReporter do
           body: include("10.0.0.1")
         )
       end
+    end
+
+    it "with :minimal still hides IP/User-Agent from nested context" do
+      described_class.report(exception, nested_context)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        satisfy { |h|
+          h[:body].include?("GET /nested") &&
+            !h[:body].include?("**Remote IP:** 10.10.10.10") &&
+            !h[:body].include?("ScullyEdgeAgent/1.0")
+        }
+      )
     end
 
     context "when an existing issue is found with :full" do

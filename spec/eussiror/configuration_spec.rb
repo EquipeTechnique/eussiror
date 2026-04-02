@@ -37,6 +37,10 @@ RSpec.describe Eussiror::Configuration do
     it "sets issue_privacy to :minimal by default" do
       expect(config.issue_privacy).to eq(:minimal)
     end
+
+    it "disables report_handled_errors by default" do
+      expect(config.report_handled_errors).to be(false)
+    end
   end
 
   describe "#issue_privacy=" do

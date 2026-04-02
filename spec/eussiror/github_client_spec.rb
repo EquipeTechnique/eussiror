@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe Eussiror::GithubClient do
-  subject(:client) { described_class.new(token: "test_token", repository: "owner/repo") }
+  subject(:client) { described_class.new(token: "xfiles_token", repository: "xfiles/unsolved-cases") }
 
   let(:api_base) { "https://api.github.com" }
   let(:fingerprint) { "abc123def456" }
@@ -16,7 +16,7 @@ RSpec.describe Eussiror::GithubClient do
         stub_request(:get, search_url)
           .to_return(
             status: 200,
-            body: JSON.generate({ "items" => [{ "number" => 42, "title" => "some issue" }] }),
+            body: JSON.generate({ "items" => [{ "number" => 42, "title" => "strange lights over district 9" }] }),
             headers: { "Content-Type" => "application/json" }
           )
       end
@@ -28,7 +28,7 @@ RSpec.describe Eussiror::GithubClient do
       it "sends the correct Authorization header" do
         client.find_issue(fingerprint)
         expect(WebMock).to have_requested(:get, search_url)
-          .with(headers: { "Authorization" => "Bearer test_token" })
+          .with(headers: { "Authorization" => "Bearer xfiles_token" })
       end
 
       it "sends the correct Accept header" do
@@ -105,19 +105,19 @@ RSpec.describe Eussiror::GithubClient do
   end
 
   describe "#create_issue" do
-    let(:create_url) { "#{api_base}/repos/owner/repo/issues" }
+    let(:create_url) { "#{api_base}/repos/xfiles/unsolved-cases/issues" }
 
     before do
       stub_request(:post, create_url)
         .to_return(
           status: 201,
-          body: JSON.generate({ "number" => 7, "html_url" => "https://github.com/owner/repo/issues/7" }),
+          body: JSON.generate({ "number" => 7, "html_url" => "https://github.com/xfiles/unsolved-cases/issues/7" }),
           headers: { "Content-Type" => "application/json" }
         )
     end
 
     it "returns the new issue number" do
-      result = client.create_issue(title: "[500] RuntimeError: oops", body: "## Error\ndetails")
+      result = client.create_issue(title: "[request] RuntimeError: UFO radar glitch", body: "## Error\ndetails")
       expect(result).to eq(7)
     end
 
@@ -131,7 +131,7 @@ RSpec.describe Eussiror::GithubClient do
     it "sends the correct Authorization header" do
       client.create_issue(title: "t", body: "b")
       expect(WebMock).to have_requested(:post, create_url)
-        .with(headers: { "Authorization" => "Bearer test_token" })
+        .with(headers: { "Authorization" => "Bearer xfiles_token" })
     end
 
     it "includes labels when provided" do
@@ -175,7 +175,7 @@ RSpec.describe Eussiror::GithubClient do
   end
 
   describe "#add_comment" do
-    let(:comment_url) { "#{api_base}/repos/owner/repo/issues/42/comments" }
+    let(:comment_url) { "#{api_base}/repos/xfiles/unsolved-cases/issues/42/comments" }
 
     before do
       stub_request(:post, comment_url)
@@ -200,7 +200,7 @@ RSpec.describe Eussiror::GithubClient do
     it "sends the correct Authorization header" do
       client.add_comment(42, body: "note")
       expect(WebMock).to have_requested(:post, comment_url)
-        .with(headers: { "Authorization" => "Bearer test_token" })
+        .with(headers: { "Authorization" => "Bearer xfiles_token" })
     end
 
     context "when the API returns an error" do

@@ -6,15 +6,18 @@ Eussiror.configure do |config|
   # Required: target GitHub repository in "owner/repository" format.
   config.github_repository = "your-org/your-repo"
 
-  # Environments where 500 errors will be reported to GitHub.
+  # Environments where errors will be reported to GitHub.
   # Default: ["production"]
   config.environments = %w[production]
 
   # How much request/user context to include in issue bodies and occurrence comments.
   # :minimal (default) — method + path only; safest for public repos.
-  # :standard — also Remote IP and User-Agent when present in the Rack env.
+  # :standard — also Remote IP and User-Agent when present.
   # :full — standard + User section from env["eussiror.user_id"] / ["eussiror.user_label"].
   # config.issue_privacy = :minimal
+
+  # Also report errors caught by Rails.error.handle (default: false — only unhandled).
+  # config.report_handled_errors = false
 
   # Labels applied to every new issue created by Eussiror (optional).
   # config.labels = %w[bug automated]

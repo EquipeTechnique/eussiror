@@ -20,17 +20,21 @@ module Eussiror
     # Set to false to report synchronously (useful in tests)
     attr_accessor :async
 
+    # When true, errors caught by Rails.error.handle are also reported (default: false).
+    attr_accessor :report_handled_errors
+
     # Controls how much request/user context is included in GitHub issue bodies and
     # occurrence comments. :minimal is safest for public repos; :full for trusted private teams.
     attr_reader :issue_privacy
 
     def initialize
-      @environments       = %w[production]
-      @labels             = []
-      @assignees          = []
-      @ignored_exceptions = []
-      @async              = true
-      @issue_privacy      = :minimal
+      @environments           = %w[production]
+      @labels                 = []
+      @assignees              = []
+      @ignored_exceptions     = []
+      @async                  = true
+      @report_handled_errors  = false
+      @issue_privacy          = :minimal
     end
 
     def issue_privacy=(value)

@@ -5,9 +5,10 @@ require "eussiror/configuration"
 require "eussiror/fingerprint"
 require "eussiror/github_client"
 require "eussiror/release_env"
+require "eussiror/context_extractor"
 require "eussiror/issue_formatting"
 require "eussiror/error_reporter"
-require "eussiror/middleware"
+require "eussiror/error_subscriber"
 require "eussiror/railtie" if defined?(Rails::Railtie)
 
 module Eussiror

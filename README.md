@@ -6,7 +6,7 @@
 [![CI](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml/badge.svg)](https://github.com/EquipeTechnique/eussiror/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Eussiror** automatically creates GitHub issues when your Rails application returns a 500 error in production. If the same error already has an open issue, it adds a comment with the new occurrence timestamp instead — keeping your issue tracker clean and deduplicated.
+**Eussiror** automatically creates GitHub issues when your Rails application raises an unhandled exception — whether from an HTTP request, an ActiveJob, Action Cable, or any other Rails execution context. If the same error already has an open issue, it adds a comment with the new occurrence instead — keeping your issue tracker clean and deduplicated.
 
 ---
 
@@ -62,51 +62,60 @@ rails destroy eussiror:install
 
 ## Configuration
 
-Edit the generated initializer:
+Edit the generated initializer (`config/initializers/eussiror.rb`). Every assignable option is listed below.
 
 ```ruby
 # config/initializers/eussiror.rb
 Eussiror.configure do |config|
-  # Required: GitHub personal access token with "repo" scope
+  # --- GitHub (required for reporting) ---
   config.github_token = ENV["GITHUB_TOKEN"]
-
-  # Required: target repository in "owner/repository" format
   config.github_repository = "your-org/your-repo"
 
-  # Environments where 500 errors will be reported (default: ["production"])
+  # --- Where and how to report ---
   config.environments = %w[production]
+  # config.issue_privacy = :minimal   # :minimal | :standard | :full — see "Issue privacy"
+  config.async = true                 # false = synchronous (e.g. tests)
 
-  # :minimal (default), :standard, or :full — see README "Issue privacy"
-  # config.issue_privacy = :minimal
+  # Also report errors caught by Rails.error.handle (default: false — only unhandled)
+  # config.report_handled_errors = false
 
-  # Labels applied to every new issue (optional)
-  config.labels = %w[bug automated]
+  # --- Issue metadata (optional) ---
+  # config.labels = %w[bug automated]
+  # config.assignees = []             # GitHub usernames (logins), not display names
 
-  # GitHub logins to assign to new issues (optional)
-  config.assignees = []
-
-  # Exception classes that should NOT trigger issue creation (optional)
-  config.ignored_exceptions = %w[ActionController::RoutingError]
-
-  # Set to false to report synchronously — recommended in test environments
-  config.async = false
+  # --- Filtering (optional) ---
+  # config.ignored_exceptions = %w[ActionController::RoutingError]
 end
 ```
 
-### Configuration options
+### Assignable options (`Eussiror.configure`)
 
 | Option | Type | Default | Description |
-|---|---|---|---|
-| `github_token` | String | `nil` | GitHub token with `repo` (or Issues write) permission |
-| `github_repository` | String | `nil` | Target repo in `owner/repo` format |
-| `environments` | Array | `["production"]` | Environments where reporting is active |
-| `labels` | Array | `[]` | Labels applied to created issues |
-| `assignees` | Array | `[]` | GitHub logins assigned to created issues |
-| `ignored_exceptions` | Array | `[]` | Exception class names (strings) to skip |
-| `async` | Boolean | `true` | Report in a background thread (set `false` in tests) |
-| `issue_privacy` | Symbol | `:minimal` | How much request/user context goes into issue bodies and occurrence comments (see below) |
+|--------|------|---------|-------------|
+| `github_token` | String | `nil` | Personal access token (classic `repo`, or fine-grained with Issues read/write on the target repo). **Required for any GitHub activity:** if blank, reporting is disabled. |
+| `github_repository` | String | `nil` | Repository in `owner/repo` form. **Required with `github_token`** for reporting. |
+| `environments` | Array of String | `["production"]` | Rails/Rack env names where reporting runs. Current env comes from `Rails.env` (Rails) or `ENV["RAILS_ENV"]` (default `"development"`). |
+| `issue_privacy` | Symbol or String | `:minimal` | How much request/user context is copied into issue bodies and occurrence comments. Must be `minimal`, `standard`, or `full` (setter raises `ArgumentError` otherwise). See **Issue privacy** below. |
+| `async` | Boolean | `true` | If `true`, `ErrorReporter` runs in a `Thread`; if `false`, reporting is synchronous (useful in tests or strict ordering). |
+| `report_handled_errors` | Boolean | `false` | When `true`, errors caught by `Rails.error.handle` are also reported (by default only unhandled errors trigger a GitHub issue). |
+| `labels` | Array of String | `[]` | Labels applied to **new** issues created by Eussiror (must exist on the repo). |
+| `assignees` | Array of String | `[]` | GitHub **login** usernames assigned to new issues (empty = none). |
+| `ignored_exceptions` | Array of String | `[]` | Exception **class names** to never report (e.g. `"ActionController::RoutingError"`). Unknown class names are ignored safely. |
 
-### Issue privacy (`issue_privacy`)
+Reporting runs only when **`#reporting_enabled?`** is true: configuration is **`#valid?`** (both `github_token` and `github_repository` non-blank after strip) **and** the current environment is listed in `environments`.
+
+### Read-only and predicates (`Eussiror.configuration`)
+
+These are not set in the initializer; they are useful for debugging or tests.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `#environment_name` | String | Label for the current environment (same source as the env guard: `Rails.env` or `ENV["RAILS_ENV"]`). Shown in GitHub issue **Context**. |
+| `#issue_privacy` | Symbol | Current privacy level after assignment (`:minimal`, `:standard`, or `:full`). |
+| `#valid?` | Boolean | `true` if `github_token` and `github_repository` are both non-blank. |
+| `#reporting_enabled?` | Boolean | `true` if `#valid?` and the current env is in `environments`. |
+
+### Issue privacy
 
 GitHub issues may be visible to people outside your core team (public repo, or future collaborators). **`issue_privacy`** controls how much context is copied into each issue:
 
@@ -125,23 +134,40 @@ When `issue_privacy` is `:full`, set these from your middleware (after authentic
 | `env["eussiror.user_id"]` | Stable user identifier (e.g. database id) |
 | `env["eussiror.user_label"]` | Optional human-readable label (e.g. email or login) — only if your policy allows it |
 
+### Context normalization
+
+`Rails.error` can provide context in multiple shapes (flat hash, symbol keys, nested env/request, request object). Eussiror normalizes this before formatting issues/comments.
+
+Recognized families of keys (first non-empty wins):
+- **Request method/path:** `REQUEST_METHOD` / `PATH_INFO` (string or symbol), nested `env`/`rack`, request object (`request_method`, `fullpath`, `path`)
+- **IP/user-agent:** `REMOTE_ADDR` / `HTTP_USER_AGENT`, nested `headers["User-Agent"]`, request object (`remote_ip`, `user_agent`, `ip`)
+- **User fields:** `eussiror.user_id`, `eussiror.user_label`, plus `user_id` / `user_label` fallbacks
+
+Explicit top-level keys win over nested values when both are present.
+
 **Release** in the issue **Context** section is taken from the first non-empty environment variable among: `RELEASE` (recommended explicit override), then `SOURCE_VERSION` (Scalingo and others), `HEROKU_SLUG_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `REVISION`, `GIT_COMMIT`, `CI_COMMIT_SHA` (GitLab CI, etc.), `GITHUB_SHA` (GitHub Actions).
 
 ---
 
 ## How it works
 
-When a 500 error occurs:
+Eussiror subscribes to **`Rails.error`** (`ActiveSupport::ErrorReporter`, available since Rails 7.1). Rails wraps every execution context — HTTP requests, ActiveJob, Action Cable, etc. — in this reporter, so Eussiror catches exceptions regardless of origin.
 
-1. The Rack middleware catches the rendered 500 response.
-2. A **fingerprint** is computed from the exception class, message, and first application backtrace line.
-3. The GitHub API is searched for an open issue containing that fingerprint.
-4. If **no issue exists** → a new issue is created with the exception details.
-5. If **an issue exists** → a comment with the new occurrence (timestamp and optional request/user context) is added.
+1. An unhandled exception (or a handled one if `report_handled_errors` is enabled) reaches `Rails.error`.
+2. `Eussiror::ErrorSubscriber` receives the exception with its `severity`, `source`, and `context`.
+3. A **fingerprint** is computed from the exception class, message, and first application backtrace line.
+4. The GitHub API is searched for an open issue containing that fingerprint.
+5. If **no issue exists** → a new issue is created with structured details.
+6. If **an issue exists** → a comment with the new occurrence is added.
+
+The issue title includes a **source tag** (`[request]`, `[job]`, `[cable]`, or `[error]`) so you can tell at a glance where the exception came from. Source classification uses a hybrid strategy:
+- strict mapping for known Rails sources,
+- heuristic fallback using source prefixes/contains (`ActiveJob`, `ActionCable`, `ActionDispatch`/`Rack`),
+- final fallback to `[error]`.
 
 ### Example GitHub issue
 
-**Title:** `[500] RuntimeError: something went wrong`
+**Title:** `[request] RuntimeError: something went wrong`
 
 **Body:**
 ```
@@ -154,6 +180,7 @@ When a 500 error occurs:
 ## Context
 
 **Environment:** `production`
+**Source:** `request` (omitted when the source is the default "error")
 **Release:** `abc123` (when a release env var from the list in **Optional user context** is set)
 
 ## User
@@ -254,8 +281,8 @@ lib/
 └── eussiror/
     ├── version.rb                      # Gem version constant
     ├── configuration.rb                # Configuration value object + guards
-    ├── railtie.rb                      # Rails integration: inserts Middleware into the stack
-    ├── middleware.rb                   # Rack middleware: detects 500s and calls ErrorReporter
+    ├── railtie.rb                      # Rails integration: subscribes to Rails.error
+    ├── error_subscriber.rb             # ActiveSupport::ErrorReporter subscriber
     ├── fingerprint.rb                  # Computes a stable SHA256 fingerprint per exception type
     ├── github_client.rb                # GitHub REST API v3 calls via Net::HTTP
     ├── issue_formatting.rb             # Issue body and occurrence comment text
@@ -267,32 +294,28 @@ lib/generators/eussiror/install/
 └── templates/initializer.rb.tt         # Template for config/initializers/eussiror.rb
 ```
 
-### Request / error flow
+### Error flow
 
 ```
-HTTP Request
+Any Rails execution context
+(HTTP request, ActiveJob, Action Cable, Rake, etc.)
+    │
+    ▼  unhandled exception
+Rails.error (ActiveSupport::ErrorReporter)
+    │
+    ▼  report(error, handled:, severity:, context:, source:)
+Eussiror::ErrorSubscriber
+    │  filters: handled? severity == :error?
+    ▼
+Eussiror::ErrorReporter.report(exception, context, source:)
+    │
+    ├── Fingerprint.compute(exception)
+    ├── GithubClient.find_issue(fingerprint)
+    │     found  → GithubClient.add_comment (occurrence)
+    │     absent → GithubClient.create_issue (structured body)
     │
     ▼
-Eussiror::Middleware          (outermost Rack middleware)
-    │
-    ▼
-ActionDispatch::ShowExceptions (catches Rails exceptions, stores them in env)
-    │
-    ▼
-[... rest of Rails stack ...]
-    │
-    ▼  (response travels back up)
-ActionDispatch::ShowExceptions → sets env["action_dispatch.exception"]
-                                 returns HTTP 500 response
-    │
-    ▼
-Eussiror::Middleware
-    ├── status == 500 AND env["action_dispatch.exception"] present?
-    │     YES → ErrorReporter.report(exception, env)
-    │     NO  → pass response through unchanged
-    │
-    ▼
-HTTP Response returned to client
+GitHub Issues
 ```
 
 ### Component responsibilities
@@ -308,13 +331,10 @@ Plain Ruby value object with attr_accessors for every option. Exposes `#environm
 `#issue_privacy` must be `:minimal`, `:standard`, or `:full` (setter raises `ArgumentError` otherwise).
 
 #### `Eussiror::Railtie`
-Rails `Railtie` that runs one initializer: it inserts `Eussiror::Middleware` **before** `ActionDispatch::ShowExceptions` in the middleware stack. This positions our middleware as the outermost wrapper, so it sees the fully rendered 500 response on the way back out.
+Rails `Railtie` that runs one initializer: it registers `Eussiror::ErrorSubscriber` with `Rails.error.subscribe`, hooking into every execution context Rails wraps (requests, jobs, channels, etc.).
 
-#### `Eussiror::Middleware`
-Rack middleware with a standard `#call(env)` interface.
-- On a normal response: passes through.
-- On a 500 response with `env["action_dispatch.exception"]`: calls `ErrorReporter.report`.
-- On a re-raised exception (non-standard setups): calls `ErrorReporter.report` before re-raising.
+#### `Eussiror::ErrorSubscriber`
+Implements the `ActiveSupport::ErrorReporter` subscriber interface (`#report(error, handled:, severity:, context:, source:)`). Filters out handled errors (unless `report_handled_errors` is enabled) and non-`:error` severities, then delegates to `ErrorReporter`.
 
 #### `Eussiror::Fingerprint`
 Stateless module with a single public method: `.compute(exception) → String`.
@@ -340,20 +360,21 @@ Thin HTTP client wrapping three GitHub REST API v3 endpoints. Uses only `Net::HT
 | `#add_comment(issue_number, body:)` | `POST /repos/{owner}/{repo}/issues/{n}/comments` | Returns comment id |
 
 #### `Eussiror::ErrorReporter`
-Stateless module that orchestrates the full reporting flow. Called by the middleware.
+Stateless module that orchestrates the full reporting flow. Called by `ErrorSubscriber`.
 
 1. Checks `Eussiror.configuration.reporting_enabled?` — returns early if not.
 2. Checks `ignored_exceptions` — returns early if matched.
-3. Dispatches in a `Thread.new` when `config.async` is `true` (default), or inline otherwise.
-4. Computes fingerprint → searches GitHub → creates issue (structured body: Error Details, Context, optional User, Request, Backtrace) or adds an occurrence comment (timestamp + request summary; more fields when `issue_privacy` is `:standard` / `:full`).
-5. All GitHub errors are rescued and emitted as `warn` messages — the gem **never crashes your app**.
+3. Maps the `source` string to a human-readable tag (`[request]`, `[job]`, `[cable]`, or `[error]`).
+4. Dispatches in a `Thread.new` when `config.async` is `true` (default), or inline otherwise.
+5. Computes fingerprint → searches GitHub → creates issue (structured body: Error Details, Context, optional User, Request, Backtrace) or adds an occurrence comment.
+6. All GitHub errors are rescued and emitted as `warn` messages — the gem **never crashes your app**.
 
 #### `Eussiror::Generators::InstallGenerator`
 Standard `Rails::Generators::Base` subclass. Copies `templates/initializer.rb.tt` to `config/initializers/eussiror.rb` using Thor's `template` method, then prints a **post-install notice** (`show_post_install_notice`). Supports `rails destroy eussiror:install` for clean uninstallation.
 
 ### Testing approach
 
-- **Unit specs**: each component is tested in isolation. `GithubClient` uses `WebMock` to stub HTTP calls. `ErrorReporter` uses RSpec doubles for `GithubClient`.
+- **Unit specs**: each component is tested in isolation. `GithubClient` uses `WebMock` to stub HTTP calls. `ErrorReporter` and `ErrorSubscriber` use RSpec doubles.
 - **Generator spec**: uses Rails generator test helpers (`prepare_destination`, `invoke_all`) and asserts post-install output.
 - **Appraisals**: the `Appraisals` file defines three gemfiles (`rails-7.2`, `rails-8.0`, `rails-8.1`) so the full test suite runs against each supported Rails version.
 

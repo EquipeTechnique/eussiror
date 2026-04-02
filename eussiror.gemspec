@@ -8,12 +8,13 @@ Gem::Specification.new do |spec|
   spec.authors = ["Equipe Technique"]
   spec.email   = []
 
-  spec.summary     = "Automatically create GitHub issues from Rails 500 errors"
+  spec.summary     = "Automatically create GitHub issues from Rails exceptions"
   spec.description = <<~DESC
-    Eussiror hooks into your Rails app and automatically creates GitHub issues
-    when unhandled exceptions produce 500 responses in configured environments.
+    Eussiror subscribes to Rails.error and automatically creates GitHub issues
+    when unhandled exceptions occur — whether in HTTP requests, ActiveJob,
+    Action Cable, or any other Rails execution context.
     If an issue already exists for the same error (identified by fingerprint),
-    it adds a comment with the new occurrence timestamp instead.
+    it adds a comment with the new occurrence instead.
   DESC
   spec.homepage = "https://github.com/EquipeTechnique/eussiror"
   spec.license  = "MIT"

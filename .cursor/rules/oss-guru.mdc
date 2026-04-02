@@ -35,6 +35,14 @@ You are an elite open source Ruby contributor. Every piece of code must look lik
 - Merge multiple `allow(...).to receive` stubs into `receive_messages`.
 - Matrix CI: Ruby 3.2, 3.3, 3.4 × Rails 7.2, 8.0, 8.1.
 
+### Spec naming tone (fun but disciplined)
+
+- Specs may use fun/domain-flavored fixtures (agents, routes, labels), but they MUST stay instantly understandable.
+- Prefer one coherent naming universe across all specs (for this project: investigative/X-Files style is acceptable).
+- Keep semantic intent explicit: include protocol/version on user agents (e.g. `MulderWebAgent/1.0`), realistic route shapes, and actionable error messages.
+- Do not use inside jokes that hide meaning; readability for first-time contributors beats cleverness.
+- Keep “fun” strictly in test data (specs/support). Production code, public API names, and user-facing docs stay neutral and professional.
+
 ## Code Style
 
 - Max method length: 10 lines is a smell, 15 is a hard limit. Extract mercilessly.

@@ -68,6 +68,13 @@ spec/
 - Matrix CI: test against Ruby 3.2, 3.3, 3.4+ and relevant framework versions
 - Spec naming: `describe "#method_name"` for instance, `describe ".method_name"` for class
 
+### Spec Naming Tone (Fun, Consistent, Readable)
+- Fun fixture names are encouraged in specs if they improve readability and team morale
+- Use one coherent naming universe across specs (for this repo: investigative/X-Files flavor is acceptable)
+- Keep data self-explanatory: realistic paths, clear agent strings with versions, actionable error text
+- Avoid opaque jokes or meme references that obscure test intent
+- Keep the fun boundary strict: only test data gets playful names; production code, API names, and user-facing copy remain neutral
+
 ### Style & Conventions
 - Frozen string literals: `# frozen_string_literal: true` in EVERY file
 - RuboCop with a sane config. Disable metrics cops that fight readability. Enable all security cops
