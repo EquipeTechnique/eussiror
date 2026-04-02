@@ -50,7 +50,9 @@ bundle install
 rails generate eussiror:install
 ```
 
-The generator creates `config/initializers/eussiror.rb` with all available options commented out. To undo the installation:
+The generator creates `config/initializers/eussiror.rb` with all available options commented out and prints a short **post-install notice** in the terminal (next steps, token safety, `issue_privacy`).
+
+To undo the installation:
 
 ```bash
 rails destroy eussiror:install
@@ -73,6 +75,9 @@ Eussiror.configure do |config|
 
   # Environments where 500 errors will be reported (default: ["production"])
   config.environments = %w[production]
+
+  # :minimal (default), :standard, or :full — see README "Issue privacy"
+  # config.issue_privacy = :minimal
 
   # Labels applied to every new issue (optional)
   config.labels = %w[bug automated]
@@ -99,6 +104,28 @@ end
 | `assignees` | Array | `[]` | GitHub logins assigned to created issues |
 | `ignored_exceptions` | Array | `[]` | Exception class names (strings) to skip |
 | `async` | Boolean | `true` | Report in a background thread (set `false` in tests) |
+| `issue_privacy` | Symbol | `:minimal` | How much request/user context goes into issue bodies and occurrence comments (see below) |
+
+### Issue privacy (`issue_privacy`)
+
+GitHub issues may be visible to people outside your core team (public repo, or future collaborators). **`issue_privacy`** controls how much context is copied into each issue:
+
+| Value | Request in issue | User in issue | Typical use |
+|-------|------------------|---------------|-------------|
+| `:minimal` | HTTP method + path only | Never | Public repos, OSS, minimal footprint (default) |
+| `:standard` | Also Remote IP and `User-Agent` when present in the Rack `env` | Never | Private repo, ops-friendly debugging |
+| `:full` | Same as `:standard` | **User** section if you set Rack keys below | Private repo, team accepts user context in issues |
+
+### Optional user context (Rack `env`)
+
+When `issue_privacy` is `:full`, set these from your middleware (after authentication):
+
+| Key | Meaning |
+|-----|---------|
+| `env["eussiror.user_id"]` | Stable user identifier (e.g. database id) |
+| `env["eussiror.user_label"]` | Optional human-readable label (e.g. email or login) — only if your policy allows it |
+
+**Release** in the issue **Context** section is taken from the first non-empty environment variable among: `RELEASE` (recommended explicit override), then `SOURCE_VERSION` (Scalingo and others), `HEROKU_SLUG_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `REVISION`, `GIT_COMMIT`, `CI_COMMIT_SHA` (GitLab CI, etc.), `GITHUB_SHA` (GitHub Actions).
 
 ---
 
@@ -110,7 +137,7 @@ When a 500 error occurs:
 2. A **fingerprint** is computed from the exception class, message, and first application backtrace line.
 3. The GitHub API is searched for an open issue containing that fingerprint.
 4. If **no issue exists** → a new issue is created with the exception details.
-5. If **an issue exists** → a comment with the current timestamp is added.
+5. If **an issue exists** → a comment with the new occurrence (timestamp and optional request/user context) is added.
 
 ### Example GitHub issue
 
@@ -123,8 +150,21 @@ When a 500 error occurs:
 **Exception:** `RuntimeError`
 **Message:** something went wrong
 **First occurrence:** 2026-02-26 10:30:00 UTC
+
+## Context
+
+**Environment:** `production`
+**Release:** `abc123` (when a release env var from the list in **Optional user context** is set)
+
+## User
+
+(Only when issue_privacy is :full and eussiror.user_* keys are set.)
+
+## Request
+
 **Request:** `GET /dashboard`
-**Remote IP:** 1.2.3.4
+**Remote IP:** 1.2.3.4 (only when issue_privacy is :standard or :full)
+**User-Agent:** … (same)
 
 ## Backtrace
 
@@ -134,9 +174,15 @@ app/controllers/dashboard_controller.rb:42:in 'index'
 
 ### Example occurrence comment
 
+With `:minimal` (default):
+
 ```
 **New occurrence:** 2026-02-26 14:55:02 UTC
+
+**Request:** `GET /dashboard`
 ```
+
+With `:standard` or `:full`, Remote IP and User-Agent are included when present; with `:full`, **User id** appears when `env["eussiror.user_id"]` is set.
 
 ---
 
@@ -212,6 +258,8 @@ lib/
     ├── middleware.rb                   # Rack middleware: detects 500s and calls ErrorReporter
     ├── fingerprint.rb                  # Computes a stable SHA256 fingerprint per exception type
     ├── github_client.rb                # GitHub REST API v3 calls via Net::HTTP
+    ├── issue_formatting.rb             # Issue body and occurrence comment text
+    ├── release_env.rb                  # Optional release label from ENV (PaaS/CI keys)
     └── error_reporter.rb               # Orchestrator: fingerprint → search → create or comment
 
 lib/generators/eussiror/install/
@@ -253,9 +301,11 @@ HTTP Response returned to client
 Top-level module. Holds the singleton `configuration` object and exposes `.configure { |c| }`. All other components read `Eussiror.configuration`.
 
 #### `Eussiror::Configuration`
-Plain Ruby value object with attr_accessors for every option. Contains the two guard predicates used by `ErrorReporter`:
+Plain Ruby value object with attr_accessors for every option. Exposes `#environment_name` for issue bodies. Contains the two guard predicates used by `ErrorReporter`:
 - `#valid?` — both token and repository are present
 - `#reporting_enabled?` — valid config AND current Rails env is in `environments`
+
+`#issue_privacy` must be `:minimal`, `:standard`, or `:full` (setter raises `ArgumentError` otherwise).
 
 #### `Eussiror::Railtie`
 Rails `Railtie` that runs one initializer: it inserts `Eussiror::Middleware` **before** `ActionDispatch::ShowExceptions` in the middleware stack. This positions our middleware as the outermost wrapper, so it sees the fully rendered 500 response on the way back out.
@@ -295,16 +345,16 @@ Stateless module that orchestrates the full reporting flow. Called by the middle
 1. Checks `Eussiror.configuration.reporting_enabled?` — returns early if not.
 2. Checks `ignored_exceptions` — returns early if matched.
 3. Dispatches in a `Thread.new` when `config.async` is `true` (default), or inline otherwise.
-4. Computes fingerprint → searches GitHub → creates issue or adds comment.
+4. Computes fingerprint → searches GitHub → creates issue (structured body: Error Details, Context, optional User, Request, Backtrace) or adds an occurrence comment (timestamp + request summary; more fields when `issue_privacy` is `:standard` / `:full`).
 5. All GitHub errors are rescued and emitted as `warn` messages — the gem **never crashes your app**.
 
 #### `Eussiror::Generators::InstallGenerator`
-Standard `Rails::Generators::Base` subclass. Copies `templates/initializer.rb.tt` to `config/initializers/eussiror.rb` using Thor's `template` method. Supports `rails destroy eussiror:install` for clean uninstallation.
+Standard `Rails::Generators::Base` subclass. Copies `templates/initializer.rb.tt` to `config/initializers/eussiror.rb` using Thor's `template` method, then prints a **post-install notice** (`show_post_install_notice`). Supports `rails destroy eussiror:install` for clean uninstallation.
 
 ### Testing approach
 
 - **Unit specs**: each component is tested in isolation. `GithubClient` uses `WebMock` to stub HTTP calls. `ErrorReporter` uses RSpec doubles for `GithubClient`.
-- **Generator spec**: uses Rails generator test helpers (`prepare_destination`, `run_generator`).
+- **Generator spec**: uses Rails generator test helpers (`prepare_destination`, `invoke_all`) and asserts post-install output.
 - **Appraisals**: the `Appraisals` file defines three gemfiles (`rails-7.2`, `rails-8.0`, `rails-8.1`) so the full test suite runs against each supported Rails version.
 
 ---

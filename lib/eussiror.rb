@@ -4,6 +4,8 @@ require "eussiror/version"
 require "eussiror/configuration"
 require "eussiror/fingerprint"
 require "eussiror/github_client"
+require "eussiror/release_env"
+require "eussiror/issue_formatting"
 require "eussiror/error_reporter"
 require "eussiror/middleware"
 require "eussiror/railtie" if defined?(Rails::Railtie)

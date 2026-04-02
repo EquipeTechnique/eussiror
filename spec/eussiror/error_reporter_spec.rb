@@ -17,14 +17,25 @@ RSpec.describe Eussiror::ErrorReporter do
     }
   end
 
-  def configure_eussiror(env_name: "production", async: false)
+  def stub_rails_env(value)
+    allow(ENV).to receive(:fetch).and_wrap_original do |original, *args|
+      if args[0] == "RAILS_ENV" && args[1] == "development"
+        value
+      else
+        original.call(*args)
+      end
+    end
+  end
+
+  def configure_eussiror(env_name: "production", async: false, issue_privacy: :minimal)
     Eussiror.configure do |config|
       config.github_token      = "fake_token"
       config.github_repository = "owner/repo"
       config.environments      = [env_name]
       config.async             = async
+      config.issue_privacy     = issue_privacy
     end
-    allow(ENV).to receive(:fetch).with("RAILS_ENV", "development").and_return(env_name)
+    stub_rails_env(env_name)
   end
 
   describe ".report" do
@@ -34,7 +45,7 @@ RSpec.describe Eussiror::ErrorReporter do
           c.github_repository = "owner/repo"
           c.environments      = %w[production]
         end
-        allow(ENV).to receive(:fetch).with("RAILS_ENV", "development").and_return("production")
+        stub_rails_env("production")
         allow(Eussiror::GithubClient).to receive(:new)
 
         described_class.report(exception, env)
@@ -44,7 +55,7 @@ RSpec.describe Eussiror::ErrorReporter do
 
       it "does nothing when current env is not in configured environments" do
         configure_eussiror(env_name: "production")
-        allow(ENV).to receive(:fetch).with("RAILS_ENV", "development").and_return("development")
+        stub_rails_env("development")
         allow(Eussiror::GithubClient).to receive(:new)
 
         described_class.report(exception, env)
@@ -190,6 +201,20 @@ RSpec.describe Eussiror::ErrorReporter do
       end
     end
 
+    context "when report itself raises before dispatch completes" do
+      it "rescues and warns without propagating" do
+        configure_eussiror
+        cfg = Eussiror.configuration
+        allow(cfg).to receive(:async).and_raise(StandardError, "boom")
+
+        expect do
+          described_class.report(exception, env)
+        end.to output(
+          /ErrorReporter\.report raised an unexpected error: StandardError: boom/
+        ).to_stderr
+      end
+    end
+
     context "when async is true" do
       let(:mock_client) { instance_double(Eussiror::GithubClient) }
 
@@ -279,6 +304,115 @@ RSpec.describe Eussiror::ErrorReporter do
       expect(mock_client).to have_received(:create_issue).with(
         hash_including(title: satisfy { |t| t.length <= "[500] RuntimeError: ".length + 120 })
       )
+    end
+  end
+
+  describe "issue_privacy" do
+    let(:mock_client) { instance_double(Eussiror::GithubClient) }
+    let(:rich_env) do
+      {
+        "REQUEST_METHOD" => "GET",
+        "PATH_INFO" => "/x",
+        "REMOTE_ADDR" => "10.0.0.1",
+        "HTTP_USER_AGENT" => "TestAgent/1.0",
+        Eussiror::ErrorReporter::USER_ID_KEY => "42"
+      }
+    end
+
+    before do
+      configure_eussiror(issue_privacy: :minimal)
+      allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
+      allow(mock_client).to receive_messages(find_issue: nil, create_issue: 1)
+    end
+
+    it "includes Context and Environment in new issue bodies" do
+      described_class.report(exception, rich_env)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("## Context"))
+      )
+    end
+
+    it "with :minimal omits Remote IP in the body even when present" do
+      described_class.report(exception, rich_env)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        satisfy { |h| !h[:body].include?("**Remote IP:**") }
+      )
+    end
+
+    it "with :standard includes Remote IP and User-Agent in the body" do
+      Eussiror.configuration.issue_privacy = :standard
+      described_class.report(exception, rich_env)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        satisfy { |h|
+          h[:body].include?("**Remote IP:** 10.0.0.1") && h[:body].include?("TestAgent/1.0")
+        }
+      )
+    end
+
+    it "with :full includes User section when eussiror.user_id is set" do
+      Eussiror.configuration.issue_privacy = :full
+      described_class.report(exception, rich_env)
+
+      expect(mock_client).to have_received(:create_issue).with(
+        satisfy { |h| h[:body].include?("## User") && h[:body].include?("`42`") }
+      )
+    end
+
+    it "includes Release in Context when RELEASE env is set" do
+      apply_env_overrides("RELEASE" => "v9.0.0") do
+        described_class.report(exception, rich_env)
+      end
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("**Release:** `v9.0.0`"))
+      )
+    end
+
+    it "includes Release from SOURCE_VERSION when RELEASE is unset" do
+      apply_env_overrides("RELEASE" => nil, "SOURCE_VERSION" => "scalingo-abc123") do
+        described_class.report(exception, rich_env)
+      end
+
+      expect(mock_client).to have_received(:create_issue).with(
+        hash_including(body: include("**Release:** `scalingo-abc123`"))
+      )
+    end
+
+    context "when an existing issue is found" do
+      before do
+        configure_eussiror(issue_privacy: :standard)
+        allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
+        allow(mock_client).to receive_messages(find_issue: 7, add_comment: 999, create_issue: 1)
+      end
+
+      it "includes Remote IP in the occurrence comment" do
+        described_class.report(exception, rich_env)
+
+        expect(mock_client).to have_received(:add_comment).with(
+          7,
+          body: include("10.0.0.1")
+        )
+      end
+    end
+
+    context "when an existing issue is found with :full" do
+      before do
+        configure_eussiror(issue_privacy: :full)
+        allow(Eussiror::GithubClient).to receive(:new).and_return(mock_client)
+        allow(mock_client).to receive_messages(find_issue: 7, add_comment: 999, create_issue: 1)
+      end
+
+      it "includes user id in the occurrence comment" do
+        described_class.report(exception, rich_env)
+
+        expect(mock_client).to have_received(:add_comment).with(
+          7,
+          body: include("**User id:** `42`")
+        )
+      end
     end
   end
 

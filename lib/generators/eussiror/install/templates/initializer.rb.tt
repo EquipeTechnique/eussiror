@@ -10,6 +10,12 @@ Eussiror.configure do |config|
   # Default: ["production"]
   config.environments = %w[production]
 
+  # How much request/user context to include in issue bodies and occurrence comments.
+  # :minimal (default) — method + path only; safest for public repos.
+  # :standard — also Remote IP and User-Agent when present in the Rack env.
+  # :full — standard + User section from env["eussiror.user_id"] / ["eussiror.user_label"].
+  # config.issue_privacy = :minimal
+
   # Labels applied to every new issue created by Eussiror (optional).
   # config.labels = %w[bug automated]
 

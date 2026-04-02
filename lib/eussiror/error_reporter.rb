@@ -5,6 +5,10 @@ module Eussiror
     # Maximum number of backtrace lines included in an issue body.
     MAX_BACKTRACE_LINES = 20
 
+    # Rack env keys for optional user context (same as IssueFormatting::USER_ID_KEY).
+    USER_ID_KEY    = IssueFormatting::USER_ID_KEY
+    USER_LABEL_KEY = IssueFormatting::USER_LABEL_KEY
+
     class << self
       # Entry point called by the middleware.
       # Checks configuration guards, then dispatches async or sync.
@@ -43,11 +47,11 @@ module Eussiror
         existing_issue = client.find_issue(fingerprint)
 
         if existing_issue
-          client.add_comment(existing_issue, body: occurrence_comment)
+          client.add_comment(existing_issue, body: IssueFormatting.occurrence_comment(env, config))
         else
           client.create_issue(
             title: issue_title(exception),
-            body: issue_body(exception, env, fingerprint),
+            body: IssueFormatting.issue_body(exception, env, fingerprint, config, MAX_BACKTRACE_LINES),
             labels: config.labels,
             assignees: config.assignees
           )
@@ -59,57 +63,6 @@ module Eussiror
       def issue_title(exception)
         message = exception.message.to_s.lines.first.to_s.strip[0, 120]
         "[500] #{exception.class}: #{message}"
-      end
-
-      def issue_body(exception, env, fingerprint)
-        request_info = build_request_info(env)
-        backtrace    = format_backtrace(exception)
-
-        <<~BODY
-          ## Error Details
-
-          **Exception:** `#{exception.class}`
-          **Message:** #{exception.message}
-          **First occurrence:** #{current_timestamp}
-          #{request_info}
-
-          ## Backtrace
-
-          ```
-          #{backtrace}
-          ```
-
-          <!-- #{GithubClient::FINGERPRINT_MARKER}:#{fingerprint} -->
-        BODY
-      end
-
-      def occurrence_comment
-        "**New occurrence:** #{current_timestamp}"
-      end
-
-      def current_timestamp
-        Time.now.utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-      end
-
-      def build_request_info(env)
-        return "" if env.blank?
-
-        method      = env["REQUEST_METHOD"]
-        path        = env["PATH_INFO"]
-        remote_addr = env["REMOTE_ADDR"]
-
-        return "" unless method && path
-
-        parts = ["**Request:** `#{method} #{path}`"]
-        parts << "**Remote IP:** #{remote_addr}" if remote_addr
-
-        "\n#{parts.join("\n")}"
-      end
-
-      def format_backtrace(exception)
-        (exception.backtrace || [])
-          .first(MAX_BACKTRACE_LINES)
-          .join("\n")
       end
     end
   end

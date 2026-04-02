@@ -43,5 +43,16 @@ RSpec.describe Eussiror::Generators::InstallGenerator do
       content = File.read(initializer_path)
       expect(content).to include("config.environments")
     end
+
+    it "includes issue_privacy in the template comments" do
+      content = File.read(initializer_path)
+      expect(content).to include("issue_privacy")
+    end
+  end
+
+  describe "post-install notice" do
+    it "prints issue_privacy and next steps to stdout" do
+      expect { generator([], {}).invoke_all }.to output(/issue_privacy/).to_stdout
+    end
   end
 end

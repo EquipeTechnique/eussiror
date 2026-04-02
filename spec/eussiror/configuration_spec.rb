@@ -33,6 +33,51 @@ RSpec.describe Eussiror::Configuration do
     it "has no github_repository" do
       expect(config.github_repository).to be_nil
     end
+
+    it "sets issue_privacy to :minimal by default" do
+      expect(config.issue_privacy).to eq(:minimal)
+    end
+  end
+
+  describe "#issue_privacy=" do
+    it "accepts string values" do
+      config.issue_privacy = "standard"
+      expect(config.issue_privacy).to eq(:standard)
+    end
+
+    it "raises ArgumentError for unknown values" do
+      expect { config.issue_privacy = :invalid }.to raise_error(ArgumentError, /issue_privacy must be one of/)
+    end
+  end
+
+  describe "#environment_name" do
+    let(:rails_with_broken_env) do
+      Object.new.tap do |o|
+        o.instance_eval do
+          def respond_to?(name, _include_all: false)
+            name == :env
+          end
+
+          def env
+            raise NoMethodError, "test"
+          end
+        end
+      end
+    end
+
+    it "returns a non-empty string (same source as environment guards)" do
+      expect(config.environment_name).to be_a(String)
+      expect(config.environment_name.length).to be_positive
+    end
+
+    it "falls back to ENV when Rails is defined but #env raises NoMethodError" do
+      stub_const("Rails", rails_with_broken_env)
+      allow(ENV).to receive(:fetch).and_wrap_original do |original, *args|
+        args[0] == "RAILS_ENV" && args[1] == "development" ? "staging" : original.call(*args)
+      end
+
+      expect(config.environment_name).to eq("staging")
+    end
   end
 
   describe "#valid?" do

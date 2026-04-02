@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Additional release environment variables (`SOURCE_VERSION`, `RAILWAY_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `CI_COMMIT_SHA`, `GITHUB_SHA`) alongside existing keys.
+
+## [0.3.0] - 2026-04-02
+
+### Added
+- `Configuration#issue_privacy` (`:minimal`, `:standard`, `:full`) and `Configuration#environment_name`.
+- `Eussiror::IssueFormatting` for structured GitHub issue bodies and repeat-occurrence comments.
+- Post-install notice after `rails generate eussiror:install`.
+
+### Changed
+- Issue and comment content use the new formatting; optional release from `RELEASE`, `HEROKU_SLUG_COMMIT`, `REVISION`, or `GIT_COMMIT`.
+
 ## [0.2.2] - 2026-02-26
 
 ### Fixed
