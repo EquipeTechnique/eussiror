@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-02
+
 ### Changed
 - **Breaking:** Replace Rack middleware with `Rails.error.subscribe` (`ActiveSupport::ErrorReporter`). Eussiror now catches **all** unhandled exceptions (HTTP requests, ActiveJob, Action Cable, Rake, etc.), not just HTTP 500s.
 - Issue titles use source-aware tags (`[request]`, `[job]`, `[cable]`, `[error]`) instead of `[500]`.
