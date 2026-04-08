@@ -8,6 +8,8 @@
 
 **Eussiror** automatically creates GitHub issues when your Rails application raises an unhandled exception — whether from an HTTP request, an ActiveJob, Action Cable, or any other Rails execution context. If the same error already has an open issue, it adds a comment with the new occurrence instead — keeping your issue tracker clean and deduplicated.
 
+**Talks**
+- Paris.rb : Tuesday 7th of April, 2026. Thank you @Wemind and Paris.rb
 ---
 
 ## Table of Contents
